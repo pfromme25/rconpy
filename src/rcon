@@ -1,0 +1,65 @@
+#!/usr/bin/python3
+# Copyright (C) 2020 Philipp Fromme
+#
+# This file is part of rconpy, a python implementation of the source rcon protocol.
+#
+# rconpy is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# rconpy is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+import socket
+
+class rcon:
+	def __init__(self, password, host="127.0.0.1", port=27015):
+		self.host = host
+		self.port = port
+		self.password = password
+		self.rid = 0
+
+	def connect(self):
+		self.socket = socket.create_connection((self.host,self.port))
+		size, rid, ptype, body = self.__send(self.password, 3)
+		if self.rid != rid:
+			exit("Authentication failed")
+
+	def close(self):
+		self.socket.close()
+
+	def cmd(self, body):
+		size, rid, ptype, body = self.__send(body, 2)
+		return body
+
+	def __send(self, body, ptype=2):
+		self.rid += 1
+		rid_bytes = self.rid.to_bytes(4, byteorder='little', signed=True)
+		ptype_bytes = ptype.to_bytes(4, byteorder='little', signed=True)
+		packet = rid_bytes + ptype_bytes + body.encode('ascii')+ b'\x00\x00'
+		size_bytes = len(packet).to_bytes(4, byteorder='little', signed=True)
+		packet = size_bytes + packet
+		self.socket.send(packet)
+		return self.__receive()
+	
+	def __receive(self):
+		size = int.from_bytes(self.socket.recv(4), 'little', signed=True)
+		rid = int.from_bytes(self.socket.recv(4), 'little', signed=True)
+		ptype = int.from_bytes(self.socket.recv(4), 'little', signed=True)
+		body = self.socket.recv(size).decode()
+		if ptype == 0:
+			pass
+			#SERVERDATA_RESPONSE_VALUE
+		elif ptype == 2:
+			pass
+			#SERVERDATA_EXECCOMMAND OR SERVERDATA_AUTH_RESPONSE
+		elif ptype == 3:
+			pass
+			#SERVERDATA_AUTH
+		return size, rid, ptype, body
